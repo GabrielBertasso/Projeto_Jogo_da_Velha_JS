@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PROJETO JOGO DA VELHA</title>
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        /* Adicionei estilos básicos para o popup e a nova funcionalidade */
+        .result-popup {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: rgba(0, 0, 0, 0.5);
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .popup-content {
+            background: rgb(255, 255, 255);
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+        }
+        
+        .button-group {
+            margin-top: 20px;
+            text-align: center;
+        }
+        
+        .game-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        
+        .board {
+            display: grid;
+            grid-template-columns: repeat(3, 100px);
+            grid-template-rows: repeat(3, 100px);
+            gap: 10px;
+            margin: 20px 0;
+        }
+        
+        .cell {
+            width: 100px;
+            height: 100px;
+            background-color: #fdffff;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 3rem;
+            cursor: pointer;
+            border: 1px solid #000000;
+        }
+        
+        .cell:hover {
+            background-color: #dfe6e9;
+        }
+        
+        .reset-btn {
+            padding: 10px 20px;
+            margin: 5px;
+            background-color: #2c3e50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        
+        .reset-btn:hover {
+            background-color: #ff0000;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>JOGO DA VELHA</h1>
+    </header>
+    
+    <div class="score-board-wrapper">
+        <h3><p style="text-align: center;"><span id=>PLACAR</span></p></h3>
+        <div class="score-board">
+            <div class="player-score">
+                <h3>Jogador X</h3>
+                <p id="score-x">0</p>
+            </div>
+            <div class="separator"></div>
+            <div class="player-score">
+                <h3>Jogador O</h3>
+                <p id="score-o">0</p>
+            </div>
+        </div>
+    </div>
+    
+    <div class="game-container">
+        <div class="turn-indicator">
+            <h3><p style="text-align: center;"><span id="current-turn">É a vez do jogador X</span></p></h3>
+        </div>
+        
+        <div class="button-group">
+            <button class="reset-btn" id="toggle-mode">Jogar contra Bot</button>
+        </div>
+        
+        <div class="board" id="board">
+            <div class="cell" data-index="0"></div>
+            <div class="cell" data-index="1"></div>
+            <div class="cell" data-index="2"></div>
+            <div class="cell" data-index="3"></div>
+            <div class="cell" data-index="4"></div>
+            <div class="cell" data-index="5"></div>
+            <div class="cell" data-index="6"></div>
+            <div class="cell" data-index="7"></div>
+            <div class="cell" data-index="8"></div>
+        </div>
+    </div>
+    
+    <div id="result-popup" class="result-popup">
+        <div class="popup-content">
+            <h2 id="result-message"></h2>
+            <button class="reset-btn" id="play-again">Jogar Novamente</button>
+        </div>
+    </div>
+    
+    <div class="button-group">
+        <button class="reset-btn" id="reset-game">Resetar Jogo</button>
+        <button class="reset-btn" id="reset-scores">Zerar Placar</button>
+    </div>
+    
+    <audio id="win-sound" src="https://assets.mixkit.co/active_storage/sfx/2015/2015-preview.mp3" preload="auto"></audio>
+    <audio id="lose-sound" src="https://assets.mixkit.co/active_storage/sfx/1945/1945-preview.mp3" preload="auto"></audio>
+    <audio id="draw-sound" src="https://assets.mixkit.co/active_storage/sfx/470/470-preview.mp3" preload="auto"></audio>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const boardElement = document.getElementById('board');
+            const statusElement = document.getElementById('current-turn');
+            const resultPopup = document.getElementById('result-popup');
+            const resultMessage = document.getElementById('result-message');
+            const playAgainButton = document.getElementById('play-again');
+            const resetGameButton = document.getElementById('reset-game');
+            const resetScoresButton = document.getElementById('reset-scores');
+            const toggleModeButton = document.getElementById('toggle-mode');
+            const scoreXElement = document.getElementById('score-x');
+            const scoreOElement = document.getElementById('score-o');
+
+            let board = Array(9).fill('');
+            let currentPlayer = 'X';
+            let gameActive = true;
+            let playerSymbol = 'X';
+            let computerSymbol = 'O';
+            let isPlayingWithBot = true;
+            let scoreX = 0;
+            let scoreO = 0;
+
+            // Inicializa o tabuleiro
+            function initializeBoard() {
+                boardElement.innerHTML = '';
+                for (let i = 0; i < 9; i++) {
+                    const cell = document.createElement('div');
+                    cell.classList.add('cell');
+                    cell.setAttribute('data-index', i);
+                    cell.addEventListener('click', () => handleCellClick(i));
+                    boardElement.appendChild(cell);
+                }
+            }
+
+            // Manipula o clique em uma célula
+            function handleCellClick(index) {
+                if (!gameActive || board[index] !== '' || (isPlayingWithBot && currentPlayer !== playerSymbol)) return;
+                
+                const symbol = currentPlayer;
+                makeMove(index, symbol);
+                
+                if (gameActive && isPlayingWithBot && currentPlayer === computerSymbol) {
+                    setTimeout(computerMove, 500);
+                }
+            }
+
+            // Faz uma jogada
+            function makeMove(index, symbol) {
+                board[index] = symbol;
+                const cell = boardElement.querySelector(`[data-index="${index}"]`);
+                cell.textContent = symbol;
+                cell.style.pointerEvents = 'none';
+
+                if (checkWin(symbol)) {
+                    endGame(false, symbol);
+                } else if (isBoardFull()) {
+                    endGame(true);
+                } else {
+                    currentPlayer = currentPlayer === 'X' ? 'O' : 'X';
+                    updateStatus();
+                }
+            }
+
+            // Jogada do computador
+            function computerMove() {
+                if (!gameActive || currentPlayer !== computerSymbol) return;
+
+                let index = randomMove(); // Para simplificar, jogada aleatória
+                makeMove(index, computerSymbol);
+            }
+
+            // Verifica se há um vencedor
+            function checkWin(symbol) {
+                const winPatterns = [
+                    [0, 1, 2], [3, 4, 5], [6, 7, 8], // linhas
+                    [0, 3, 6], [1, 4, 7], [2, 5, 8], // colunas
+                    [0, 4, 8], [2, 4, 6]             // diagonais
+                ];
+
+                return winPatterns.some(pattern => {
+                    const [a, b, c] = pattern;
+                    return board[a] === symbol && board[b] === symbol && board[c] === symbol;
+                });
+            }
+
+            // Verifica se o tabuleiro está cheio (empate)
+            function isBoardFull() {
+                return board.every(cell => cell !== '');
+            }
+
+            // Finaliza o jogo
+            function endGame(isDraw, winner = null) {
+                gameActive = false;
+                const winSound = document.getElementById('win-sound');
+                const loseSound = document.getElementById('lose-sound');
+                const drawSound = document.getElementById('draw-sound');
+
+                if (isDraw) {
+                    resultMessage.textContent = 'Empate!';
+                    setTimeout(() => {
+                        var ds = document.getElementById('draw-sound');
+                        ds.currentTime = 0;
+                        ds.play();
+                    }, 100);
+                } else {
+                    if (isPlayingWithBot) {
+                        if (winner === playerSymbol) {
+                            resultMessage.textContent = 'Você venceu!';
+                            setTimeout(() => {
+                                var ws = document.getElementById('win-sound');
+                                ws.currentTime = 0;
+                                ws.play();
+                            }, 100);
+                        } else {
+                            resultMessage.textContent = 'O boot venceu!';
+                            setTimeout(() => {
+                                var ls = document.getElementById('lose-sound');
+                                ls.currentTime = 0;
+                                ls.play();
+                            }, 100);
+                        }
+                    } else {
+                        resultMessage.textContent = `Jogador ${winner} venceu!`;
+                        winSound.currentTime = 0;
+                        winSound.play().catch(e => console.log("Audio play error:", e));
+                    }
+                    if (winner === 'X') scoreX++;
+                    if (winner === 'O') scoreO++;
+                }
+
+                scoreXElement.textContent = scoreX;
+                scoreOElement.textContent = scoreO;
+                resultPopup.style.display = 'flex';
+            }
+
+            // Atualiza o status do jogo
+            function updateStatus() {
+                if (gameActive) {
+                    const status = isPlayingWithBot 
+                        ? (currentPlayer === playerSymbol ? `É a sua vez (Jogador ${currentPlayer})` : 'Aguarde... Boot pensando')
+                        : `É a vez do Jogador ${currentPlayer}`;
+                    statusElement.textContent = status;
+                }
+            }
+
+            // Reinicia o jogo
+            function restartGame() {
+                board = Array(9).fill('');
+                currentPlayer = playerSymbol;
+                gameActive = true;
+
+                // Limpa o tabuleiro
+                const cells = boardElement.querySelectorAll('.cell');
+                cells.forEach(cell => {
+                    cell.textContent = '';
+                    cell.style.pointerEvents = 'auto';
+                });
+
+                updateStatus();
+                resultPopup.style.display = 'none';
+            }
+
+            // Reinicia o placar
+            function resetScores() {
+                scoreX = 0;
+                scoreO = 0;
+                scoreXElement.textContent = scoreX;
+                scoreOElement.textContent = scoreO;
+            }
+
+            // Alterna entre jogar contra o bot ou contra outra pessoa
+            function toggleMode() {
+                isPlayingWithBot = !isPlayingWithBot;
+                toggleModeButton.textContent = isPlayingWithBot ? 'Jogar contra Outra Pessoa' : 'Jogar contra Boot';
+                restartGame();
+            }
+
+            // Movimento completamente aleatório
+            function randomMove() {
+                const emptyCells = [];
+                for (let i = 0; i < 9; i++) {
+                    if (board[i] === '') {
+                        emptyCells.push(i);
+                    }
+                }
+
+                if (emptyCells.length > 0) {
+                    return emptyCells[Math.floor(Math.random() * emptyCells.length)];
+                }
+                return -1;
+            }
+
+            // Event Listeners
+            playAgainButton.addEventListener('click', restartGame);
+            resetGameButton.addEventListener('click', restartGame);
+            resetScoresButton.addEventListener('click', resetScores);
+            toggleModeButton.addEventListener('click', toggleMode);
+
+            // Inicializa o jogo
+            initializeBoard();
+        });
+    </script>
+</body>
+</html>
